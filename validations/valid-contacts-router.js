@@ -1,9 +1,10 @@
 const Joi = require('joi');
+const mongoose = require('mongoose');
 
 const schemaAddContact = Joi.object({
   name: Joi.string().min(3).max(30).required(),
   phone: Joi.string()
-    .pattern(/^[0-9]{3}[-][0-9]{3}[-][0-9]{2}[-][0-9]{2}$/, 'phone')
+    .pattern(/^[(][0-9]{3}[)][\s][0-9]{3}[-][0-9]{4}$/, 'phone')
     .required(),
   email: Joi.string()
     .email({
@@ -11,12 +12,13 @@ const schemaAddContact = Joi.object({
       tlds: { allow: ['com', 'net'] },
     })
     .required(),
+  favorite: Joi.boolean().optional(),
 });
 
 const schemaUpdateContact = Joi.object({
   name: Joi.string().min(3).max(30).optional(),
   phone: Joi.string()
-    .pattern(/^[0-9]{3}[-][0-9]{3}[-][0-9]{2}[-][0-9]{2}$/, 'phone')
+    .pattern(/^[(][0-9]{3}[)][\s][0-9]{3}[-][0-9]{4}$/, 'phone')
     .optional(),
   email: Joi.string()
     .email({
@@ -24,7 +26,12 @@ const schemaUpdateContact = Joi.object({
       tlds: { allow: ['com', 'net'] },
     })
     .optional(),
-}).or('name', 'email', 'phone');
+  favorite: Joi.boolean().optional(),
+}).or('name', 'email', 'phone', 'favorite');
+
+const schemaUpdateStatusContact = Joi.object({
+  favorite: Joi.boolean().required(),
+});
 
 const validate = async (schema, obj, next) => {
   try {
@@ -42,5 +49,14 @@ module.exports = {
   },
   updateContact: async (req, res, next) => {
     return await validate(schemaUpdateContact, req.body, next);
+  },
+  updateStatusContact: async (req, res, next) => {
+    return await validate(schemaUpdateStatusContact, req.body, next);
+  },
+  objectId: async (req, res, next) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.contactId)) {
+      return await next({ status: 400, message: 'Indalid Object Id' });
+    }
+    next();
   },
 };
