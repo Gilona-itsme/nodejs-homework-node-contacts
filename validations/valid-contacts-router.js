@@ -15,6 +15,15 @@ const schemaAddContact = Joi.object({
   favorite: Joi.boolean().optional(),
 });
 
+const schemaQueryContact = Joi.object({
+  sortBy: Joi.string().valid('email', 'id', 'subscription').optional(),
+  sortByDesc: Joi.string().valid('email', 'id', 'subscription').optional(),
+  filter: Joi.string().valid().optional(),
+  limit: Joi.number().integer().min(1).max(50).optional(),
+  offset: Joi.number().integer().min(0).optional(),
+  favorite: Joi.boolean().optional(),
+}).without('sortBy', 'sortByDesc');
+
 const schemaUpdateContact = Joi.object({
   name: Joi.string().min(3).max(30).optional(),
   phone: Joi.string()
@@ -46,6 +55,9 @@ const validate = async (schema, obj, next) => {
 module.exports = {
   addContact: async (req, res, next) => {
     return await validate(schemaAddContact, req.body, next);
+  },
+  queryContact: async (req, res, next) => {
+    return await validate(schemaQueryContact, req.query, next);
   },
   updateContact: async (req, res, next) => {
     return await validate(schemaUpdateContact, req.body, next);
