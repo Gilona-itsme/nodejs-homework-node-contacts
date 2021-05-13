@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { Schema, model } = mongoose;
+const gravatar = require('gravatar');
 const bcrypt = require('bcryptjs');
 const SALT_FACTOR = 6;
 const { Subscription } = require('../../helper/constants');
@@ -15,7 +16,7 @@ const userSchema = new Schema(
       required: [true, 'Email is required'],
       unique: true,
       validate(value) {
-        const re = /([a-z0-9_\.-]+)@([a-z0-9_\.-]+)\.([a-z\.]{2,6})/;
+        const re = /([a-z0-9_\\.-]+)@([a-z0-9_\\.-]+)\.([a-z\\.]{2,6})/;
         return re.test(String(value).toLowerCase());
       },
     },
@@ -28,6 +29,16 @@ const userSchema = new Schema(
       default: Subscription.STARTER,
     },
     token: {
+      type: String,
+      default: null,
+    },
+    avatar: {
+      type: String,
+      default: function () {
+        return gravatar.url(this.email, { s: '250' }, true);
+      },
+    },
+    idCloudAvatar: {
       type: String,
       default: null,
     },
