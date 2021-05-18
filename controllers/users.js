@@ -5,8 +5,11 @@ const path = require('path');
 const cloudinary = require('cloudinary').v2;
 const { promisify } = require('util');
 require('dotenv').config();
+
 const User = require('../model/users');
 const { HttpCode } = require('../helper/constants');
+const EmailService = require('../services/email');
+
 const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
 
 cloudinary.config({
@@ -18,8 +21,7 @@ cloudinary.config({
 const uploadToCloud = promisify(cloudinary.uploader.upload);
 
 const signup = async (req, res, next) => {
-  const { email } = req.body;
-  const user = await User.findByEmail(email);
+  const user = await User.findByEmail(req.body.email);
   if (user) {
     return res.status(HttpCode.CONFLICT).json({
       status: '409 Conflict',
@@ -29,14 +31,21 @@ const signup = async (req, res, next) => {
   }
   try {
     const newUser = await User.addUser(req.body);
+    const { id, name, email, subscription, avatar, verifyTokenEmail } = newUser;
+    try {
+      const emailService = new EmailService(process.env.NODE_ENV);
+      await emailService.sendVerifyEmail(verifyTokenEmail, email, name);
+    } catch (e) {
+      console.log(e.message);
+    }
     return res.status(HttpCode.CREATED).json({
       status: '201 Created',
       code: HttpCode.CREATED,
       data: {
-        id: newUser.id,
-        email: newUser.email,
-        subscription: newUser.subscription,
-        avatar: newUser.avatar,
+        id,
+        email,
+        subscription,
+        avatar,
       },
     });
   } catch (error) {
@@ -48,10 +57,10 @@ const login = async (req, res, next) => {
   const { email, password } = req.body;
   const user = await User.findByEmail(email);
   const isValidPassword = await user?.validPassword(password);
-  if (!user || !isValidPassword) {
+  if (!user || !isValidPassword || !user.verify) {
     return res.status(HttpCode.UNAUTHORIZED).json({
       status: '401 Unauthorized',
-      code: HttpCode.CONFLICT,
+      code: HttpCode.UNAUTHORIZED,
       message: 'Email or password is wrong',
     });
   }
@@ -178,6 +187,53 @@ const saveAvatarUserCloud = async req => {
   await fs.unlink(pathFile);
   return { idCloudAvatar, avatarUrl };
 };
+
+const verify = async (req, res, next) => {
+  try {
+    const user = await User.findByVarifyTokenEmail(
+      req.params.verificationToken,
+    );
+    if (user) {
+      await User.updateVarifyToken(user.id, true, null);
+      return res.status(HttpCode.OK).json({
+        status: '200 OK',
+        code: HttpCode.OK,
+        data: { message: 'Verification successful' },
+      });
+    }
+    return res.status(HttpCode.NOT_FOUND).json({
+      status: 'error',
+      code: HttpCode.NOT_FOUND,
+      data: { message: 'User not found ' },
+    });
+  } catch (e) {
+    next(e);
+  }
+};
+
+const repeatEmailVarify = async (req, res, next) => {
+  try {
+    const user = await User.findByEmail(req.body.email);
+    if (user) {
+      const { name, verifyTokenEmail, email } = user;
+      const emailService = new EmailService(process.env.NODE_ENV);
+      await emailService.sendVerifyEmail(verifyTokenEmail, email, name);
+      return res.status(HttpCode.OK).json({
+        status: 'success',
+        code: HttpCode.OK,
+        data: { message: 'Verification email sent' },
+      });
+    }
+    return res.status(HttpCode.BAD_REQUEST).json({
+      status: 'error',
+      code: HttpCode.BAD_REQUEST,
+      message: 'Verification has already been passed',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   signup,
   login,
@@ -185,4 +241,6 @@ module.exports = {
   getCurrent,
   updateSubscriptionUser,
   updateAvatar,
+  verify,
+  repeatEmailVarify,
 };
