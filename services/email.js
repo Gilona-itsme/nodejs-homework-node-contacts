@@ -12,7 +12,7 @@ class EmailService {
         break;
 
       case 'production':
-        this.link = 'link for production';
+        this.link = 'http://localhost:3000';
         break;
 
       default:
